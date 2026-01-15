@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Calzen Flow Pro</title>
+    <style>
+        :root {
+            --bg: #F2F2F7;
+            --card: #FFFFFF;
+            --text: #1C1C1E;
+            --gray: #8E8E93;
+            --blue: #007AFF;   
+            --green: #34C759;  
+            --orange: #FF9500; 
+            --red: #FF3B30;    
+            --track: #E5E5EA;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px 16px 140px 16px; /* Больше отступ снизу */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .app-container { max-width: 450px; width: 100%; }
+
+        header { 
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-bottom: 15px; width: 100%;
+        }
+        h1 { font-size: 24px; font-weight: 800; margin: 0; }
+        .icon-btn { background: none; border: none; font-size: 22px; cursor: pointer; padding: 5px; }
+
+        /* --- НАСТРОЙКИ --- */
+        #settingsPanel {
+            display: none;
+            background: var(--card);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            animation: slideDown 0.3s ease;
+        }
+        @keyframes slideDown { from {opacity: 0; transform: translateY(-10px);} to {opacity: 1; transform: translateY(0);} }
+
+        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
+        label { font-size: 11px; color: var(--gray); font-weight: 600; display: block; margin-bottom: 4px; }
+        
+        .inp-st {
+            width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #E5E5EA;
+            background: #F9F9F9; font-size: 15px; box-sizing: border-box;
+            appearance: none; 
+        }
+        .inp-st:focus { border-color: var(--blue); outline: none; background: #fff; }
+
+        .btn-calc {
+            background: #000; color: white; border: none; width: 100%; padding: 14px;
+            border-radius: 14px; font-weight: 600; font-size: 14px; cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .divider { height: 1px; background: #E5E5EA; margin: 20px 0; }
+
+        /* --- ДАШБОРД --- */
+        .dashboard {
+            background: var(--card);
+            border-radius: 24px;
+            padding: 25px 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.04);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .gauge-container { position: relative; width: 220px; height: 110px; margin: 0 auto; }
+        .gauge-val { position: absolute; bottom: 0; left: 0; right: 0; text-align: center; }
+        .gauge-val h2 { font-size: 42px; font-weight: 800; margin: 0; line-height: 1; letter-spacing: -1px; }
+        .gauge-val p { font-size: 13px; color: var(--gray); margin: 5px 0 0 0; }
+
+        .macros-row { display: flex; justify-content: space-around; margin-top: 20px; }
+        .macro-item { width: 80px; text-align: center; position: relative; }
+        .macro-gauge { height: 40px; width: 80px; margin: 0 auto; position: relative; }
+        .macro-text { 
+            position: absolute; bottom: 0; left: 0; right: 0; 
+            font-size: 15px; font-weight: 700; line-height: 1; 
+        }
+        .macro-label { font-size: 11px; color: var(--gray); margin-top: 4px; }
+
+        /* SVG */
+        svg { width: 100%; height: 100%; overflow: visible; }
+        path.bg { stroke: var(--track); stroke-width: 8; fill: none; stroke-linecap: round; }
+        path.meter { stroke-width: 8; fill: none; stroke-linecap: round; transition: stroke-dashoffset 0.8s ease; }
+        
+        .meter.kcal { stroke: var(--red); }
+        .meter.prot { stroke: var(--green); }
+        .meter.fat { stroke: var(--orange); }
+        .meter.carb { stroke: var(--blue); }
+
+        /* --- СПИСОК --- */
+        .food-list { list-style: none; padding: 0; margin: 0; }
+        .food-item {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--card); padding: 14px 18px; border-radius: 18px; margin-bottom: 8px;
+            transition: background 0.2s;
+        }
+        .food-item.editing { border: 2px solid var(--blue); background: #F0F8FF; }
+
+        .f-left h4 { margin: 0; font-size: 16px; font-weight: 500; }
+        .f-left p { margin: 4px 0 0; font-size: 12px; color: var(--gray); }
+        
+        .f-right { font-weight: 600; font-size: 14px; display: flex; align-items: center;}
+        
+        .action-btn { background: none; border: none; font-size: 18px; padding: 5px 8px; cursor: pointer; color: #C7C7CC; }
+        .edit-btn:hover { color: var(--blue); }
+        .del-btn:hover { color: var(--red); }
+
+        /* --- НИЖНЯЯ ПАНЕЛЬ --- */
+        .bottom-panel {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: rgba(255,255,255,0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            padding: 15px 15px 35px 15px;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.08);
+            border-radius: 28px 28px 0 0;
+            z-index: 100;
+        }
+        .input-group { display: flex; gap: 8px; margin-bottom: 10px; }
+        .input-group input { 
+            background: #F2F2F7; border: none; padding: 14px; border-radius: 14px; 
+            font-size: 16px; min-width: 0; flex: 1; 
+        }
+        .input-group input:focus { background: #fff; outline: 2px solid var(--blue); }
+        
+        .ai-btn { 
+            background: var(--blue); color: white; width: 50px; border-radius: 14px; 
+            border: none; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        
+        /* Кнопка добавления/сохранения */
+        .add-btn { 
+            background: #000; color: white; font-weight: 700; border-radius: 14px; 
+            border: none; padding: 14px; width: 100%; font-size: 16px; cursor: pointer;
+            transition: 0.3s;
+        }
+        .add-btn.saving { background: var(--blue); }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <header>
+        <h1>Сегодня</h1>
+        <div>
+            <button class="icon-btn" onclick="resetDay()" title="Очистить день">🗑️</button>
+            <button class="icon-btn" onclick="toggleSettings()" title="Настройки">⚙️</button>
+        </div>
+    </header>
+
+    <div id="settingsPanel">
+        <h3>👤 Параметры тела</h3>
+        <div class="settings-grid">
+            <div><label>Текущий вес (кг)</label><input type="number" id="curWeight" class="inp-st" placeholder="80"></div>
+            <div><label style="color:#007AFF">Желаемый вес</label><input type="number" id="targetWeight" class="inp-st" placeholder="70" style="border-color:#007AFF; background:#F0F8FF"></div>
+            <div><label>Рост (см)</label><input type="number" id="height" class="inp-st" placeholder="175"></div>
+            <div><label>Возраст</label><input type="number" id="age" class="inp-st" value="25"></div>
+        </div>
+        
+        <div class="settings-grid">
+            <div>
+                <label>Пол</label>
+                <select id="gender" class="inp-st"><option value="male">М</option><option value="female">Ж</option></select>
+            </div>
+            <div>
+                <label>Активность</label>
+                <select id="activity" class="inp-st">
+                    <option value="1.2">Сидячая</option>
+                    <option value="1.375">Легкая</option>
+                    <option value="1.55">Средняя</option>
+                    <option value="1.725">Высокая</option>
+                </select>
+            </div>
+        </div>
+
+        <label style="margin-top:5px; color: var(--green);">💪 Белок (от текущего веса)</label>
+        <select id="proteinMode" class="inp-st">
+            <option value="1.3">🛋 Сидячий (1.3 г/кг)</option>
+            <option value="1.5">⚖️ Поддержание (1.5 г/кг)</option>
+            <option value="1.9">🏋️ Спорт/Мышцы (1.9 г/кг)</option>
+            <option value="2.2">🔥 Похудение (2.2 г/кг)</option>
+        </select>
+        
+        <button class="btn-calc" onclick="autoCalculate()">⚡ Рассчитать нормы</button>
+
+        <div class="divider"></div>
+
+        <h3>🎯 Цели БЖУ</h3>
+        <div class="settings-grid">
+            <div><label>Ккал</label><input type="number" id="goalKcal" class="inp-st"></div>
+            <div><label>Белки</label><input type="number" id="goalProt" class="inp-st"></div>
+            <div><label>Жиры</label><input type="number" id="goalFat" class="inp-st"></div>
+            <div><label>Угли</label><input type="number" id="goalCarb" class="inp-st"></div>
+        </div>
+
+        <label style="margin-top:10px">OpenRouter API Key (для AI)</label>
+        <input type="password" id="apiKey" class="inp-st" placeholder="sk-or-..." onchange="saveData()">
+    </div>
+
+    <div class="dashboard">
+        <div class="gauge-container">
+            <svg viewBox="0 0 200 100">
+                <path d="M 20 100 A 80 80 0 0 1 180 100" class="bg" />
+                <path d="M 20 100 A 80 80 0 0 1 180 100" class="meter kcal" id="arcKcal" stroke-dasharray="251" stroke-dashoffset="251" />
+            </svg>
+            <div class="gauge-val">
+                <h2 id="txtLeft">0</h2>
+                <p>ккал осталось</p>
+            </div>
+        </div>
+
+        <div class="macros-row">
+            <div class="macro-item">
+                <div class="macro-gauge">
+                    <svg viewBox="0 0 100 50">
+                        <path d="M 10 50 A 40 40 0 0 1 90 50" class="bg" />
+                        <path d="M 10 50 A 40 40 0 0 1 90 50" class="meter prot" id="arcProt" stroke-dasharray="125" stroke-dashoffset="125" />
+                    </svg>
+                    <div class="macro-text" id="txtProt">0g</div>
+                </div>
+                <div class="macro-label">Белки</div>
+            </div>
+
+            <div class="macro-item">
+                <div class="macro-gauge">
+                    <svg viewBox="0 0 100 50">
+                        <path d="M 10 50 A 40 40 0 0 1 90 50" class="bg" />
+                        <path d="M 10 50 A 40 40 0 0 1 90 50" class="meter fat" id="arcFat" stroke-dasharray="125" stroke-dashoffset="125" />
+                    </svg>
+                    <div class="macro-text" id="txtFat">0g</div>
+                </div>
+                <div class="macro-label">Жиры</div>
+            </div>
+
+            <div class="macro-item">
+                <div class="macro-gauge">
+                    <svg viewBox="0 0 100 50">
+                        <path d="M 10 50 A 40 40 0 0 1 90 50" class="bg" />
+                        <path d="M 10 50 A 40 40 0 0 1 90 50" class="meter carb" id="arcCarb" stroke-dasharray="125" stroke-dashoffset="125" />
+                    </svg>
+                    <div class="macro-text" id="txtCarb">0g</div>
+                </div>
+                <div class="macro-label">Угли</div>
+            </div>
+        </div>
+    </div>
+
+    <ul class="food-list" id="foodList"></ul>
+
+</div>
+
+<div class="bottom-panel">
+    <div class="app-container" style="margin: 0 auto;">
+        <div class="input-group">
+            <input type="text" id="inName" placeholder="Продукт (напр. Яйцо)">
+            <button class="ai-btn" onclick="askAI()">✨</button>
+        </div>
+        <div class="input-group">
+            <input type="number" id="inKcal" placeholder="Ккал">
+            <input type="number" id="inProt" placeholder="Б">
+            <input type="number" id="inFat" placeholder="Ж">
+            <input type="number" id="inCarb" placeholder="У">
+        </div>
+        <button class="add-btn" id="mainBtn" onclick="processFood()">Добавить</button>
+    </div>
+</div>
+
+<script>
+    // --- ДАННЫЕ ---
+    let foodLog = [];
+    let editingId = null; // ID записи, которую сейчас редактируем
+
+    let settings = {
+        curWeight: 80, targetWeight: 70, height: 175, age: 25, 
+        gender: 'male', activity: '1.375', proteinMode: '2.2',
+        goals: { kcal: 2000, p: 160, f: 80, c: 200 },
+        apiKey: ''
+    };
+
+    // --- ИНИЦИАЛИЗАЦИЯ ---
+    window.onload = function() {
+        if(localStorage.getItem('myCalzenSettings')) {
+            const loaded = JSON.parse(localStorage.getItem('myCalzenSettings'));
+            settings = { ...settings, ...loaded };
+        }
+        if(localStorage.getItem('myCalzenLog')) {
+            foodLog = JSON.parse(localStorage.getItem('myCalzenLog'));
+        }
+        renderSettings();
+        updateUI();
+    };
+
+    // --- ЛОГИКА ИНТЕРФЕЙСА ---
+    function toggleSettings() {
+        const p = document.getElementById('settingsPanel');
+        p.style.display = (p.style.display === 'block') ? 'none' : 'block';
+    }
+
+    function saveData() {
+        settings.curWeight = parseFloat(document.getElementById('curWeight').value) || 0;
+        settings.targetWeight = parseFloat(document.getElementById('targetWeight').value) || 0;
+        settings.height = parseFloat(document.getElementById('height').value) || 0;
+        settings.age = parseFloat(document.getElementById('age').value) || 0;
+        settings.gender = document.getElementById('gender').value;
+        settings.activity = document.getElementById('activity').value;
+        settings.proteinMode = document.getElementById('proteinMode').value;
+        settings.apiKey = document.getElementById('apiKey').value;
+
+        settings.goals.kcal = parseInt(document.getElementById('goalKcal').value) || 0;
+        settings.goals.p = parseInt(document.getElementById('goalProt').value) || 0;
+        settings.goals.f = parseInt(document.getElementById('goalFat').value) || 0;
+        settings.goals.c = parseInt(document.getElementById('goalCarb').value) || 0;
+
+        localStorage.setItem('myCalzenSettings', JSON.stringify(settings));
+        updateUI();
+    }
+
+    function renderSettings() {
+        document.getElementById('curWeight').value = settings.curWeight;
+        document.getElementById('targetWeight').value = settings.targetWeight;
+        document.getElementById('height').value = settings.height;
+        document.getElementById('age').value = settings.age;
+        document.getElementById('gender').value = settings.gender;
+        document.getElementById('activity').value = settings.activity || '1.375';
+        document.getElementById('proteinMode').value = settings.proteinMode || '2.2';
+        document.getElementById('goalKcal').value = settings.goals.kcal;
+        document.getElementById('goalProt').value = settings.goals.p;
+        document.getElementById('goalFat').value = settings.goals.f;
+        document.getElementById('goalCarb').value = settings.goals.c;
+        document.getElementById('apiKey').value = settings.apiKey;
+    }
+
+    function autoCalculate() {
+        const curW = parseFloat(document.getElementById('curWeight').value);
+        const targetW = parseFloat(document.getElementById('targetWeight').value);
+        const h = parseFloat(document.getElementById('height').value);
+        const age = parseFloat(document.getElementById('age').value);
+        const g = document.getElementById('gender').value;
+        const act = parseFloat(document.getElementById('activity').value);
+        const protFactor = parseFloat(document.getElementById('proteinMode').value);
+
+        if(!curW || !h || !targetW) { alert("Заполни веса и рост!"); return; }
+
+        let bmr = (10 * targetW) + (6.25 * h) - (5 * age) + (g === 'male' ? 5 : -161);
+        
+        const newGoals = {};
+        newGoals.kcal = Math.round(bmr * act);
+        newGoals.p = Math.round(curW * protFactor); // Белок от текущего
+        newGoals.f = Math.round(curW * 1.0);        // Жир от текущего
+        newGoals.c = Math.round((newGoals.kcal - (newGoals.p * 4) - (newGoals.f * 9)) / 4);
+        if(newGoals.c < 30) newGoals.c = 30;
+
+        document.getElementById('goalKcal').value = newGoals.kcal;
+        document.getElementById('goalProt').value = newGoals.p;
+        document.getElementById('goalFat').value = newGoals.f;
+        document.getElementById('goalCarb').value = newGoals.c;
+        
+        saveData(); 
+        alert(`Рассчитано!\nДефицит для: ${targetW}кг\nБелок для мышц: ${newGoals.p}г`);
+    }
+
+    // --- РЕДАКТИРОВАНИЕ И ДОБАВЛЕНИЕ ---
+    function processFood() {
+        const name = document.getElementById('inName').value || "Продукт";
+        const k = parseInt(document.getElementById('inKcal').value) || 0;
+        const p = parseInt(document.getElementById('inProt').value) || 0;
+        const f = parseInt(document.getElementById('inFat').value) || 0;
+        const c = parseInt(document.getElementById('inCarb').value) || 0;
+
+        if(k===0 && p===0 && f===0 && c===0) return;
+
+        if (editingId) {
+            // Режим СОХРАНЕНИЯ (обновляем старое)
+            const index = foodLog.findIndex(item => item.id === editingId);
+            if (index !== -1) {
+                foodLog[index] = { id: editingId, name, k, p, f, c };
+            }
+            editingId = null; // Выходим из режима редактирования
+        } else {
+            // Режим ДОБАВЛЕНИЯ (создаем новое)
+            foodLog.push({ id: Date.now(), name, k, p, f, c });
+        }
+
+        saveAndRender();
+        clearInputs();
+        resetBtnState();
+    }
+
+    function startEdit(id) {
+        const item = foodLog.find(x => x.id === id);
+        if(!item) return;
+
+        // Заполняем поля данными из списка
+        document.getElementById('inName').value = item.name;
+        document.getElementById('inKcal').value = item.k;
+        document.getElementById('inProt').value = item.p;
+        document.getElementById('inFat').value = item.f;
+        document.getElementById('inCarb').value = item.c;
+
+        editingId = id; // Включаем режим редактирования
+        updateUI(); // Перерисовываем (чтобы подсветить элемент)
+
+        // Меняем кнопку
+        const btn = document.getElementById('mainBtn');
+        btn.innerText = "Сохранить изменения";
+        btn.classList.add('saving');
+    }
+
+    function deleteFood(id, event) {
+        event.stopPropagation(); // Чтобы клик не сработал как "Редактировать"
+        if(editingId === id) {
+            editingId = null;
+            clearInputs();
+            resetBtnState();
+        }
+        foodLog = foodLog.filter(x => x.id !== id);
+        saveAndRender();
+    }
+
+    function resetDay() {
+        if(confirm("Начать новый день?")) {
+            foodLog = [];
+            editingId = null;
+            clearInputs();
+            resetBtnState();
+            saveAndRender();
+        }
+    }
+
+    // --- ВСПОМОГАТЕЛЬНЫЕ ---
+    function saveAndRender() {
+        localStorage.setItem('myCalzenLog', JSON.stringify(foodLog));
+        updateUI();
+    }
+
+    function clearInputs() {
+        document.getElementById('inName').value = "";
+        document.getElementById('inKcal').value = "";
+        document.getElementById('inProt').value = "";
+        document.getElementById('inFat').value = "";
+        document.getElementById('inCarb').value = "";
+    }
+
+    function resetBtnState() {
+        const btn = document.getElementById('mainBtn');
+        btn.innerText = "Добавить";
+        btn.classList.remove('saving');
+    }
+
+    // --- ОТРИСОВКА ---
+    function updateUI() {
+        let total = { k:0, p:0, f:0, c:0 };
+        const list = document.getElementById('foodList');
+        list.innerHTML = "";
+
+        foodLog.slice().reverse().forEach(item => {
+            total.k += item.k; total.p += item.p; total.f += item.f; total.c += item.c;
+            
+            const isEditing = (item.id === editingId);
+            const li = document.createElement('li');
+            li.className = `food-item ${isEditing ? 'editing' : ''}`;
+            
+            // Клик по элементу вызывает редактирование
+            li.onclick = () => startEdit(item.id);
+
+            li.innerHTML = `
+                <div class="f-left"><h4>${item.name}</h4><p>${item.k} ккал</p></div>
+                <div class="f-right">
+                    <span style="color:var(--green)">Б:${item.p}</span>&nbsp;
+                    <span style="color:var(--orange)">Ж:${item.f}</span>&nbsp;
+                    <span style="color:var(--blue)">У:${item.c}</span>
+                    <button class="action-btn edit-btn">✏️</button>
+                    <button class="action-btn del-btn" onclick="deleteFood(${item.id}, event)">×</button>
+                </div>
+            `;
+            list.appendChild(li);
+        });
+
+        const left = settings.goals.kcal - total.k;
+        document.getElementById('txtLeft').innerText = left;
+        setArc('arcKcal', total.k, settings.goals.kcal, 251);
+
+        document.getElementById('txtProt').innerText = `${total.p}/${settings.goals.p}`;
+        setArc('arcProt', total.p, settings.goals.p, 125);
+
+        document.getElementById('txtFat').innerText = `${total.f}/${settings.goals.f}`;
+        setArc('arcFat', total.f, settings.goals.f, 125);
+
+        document.getElementById('txtCarb').innerText = `${total.c}/${settings.goals.c}`;
+        setArc('arcCarb', total.c, settings.goals.c, 125);
+    }
+
+    function setArc(id, val, max, circumference) {
+        let pct = val / max;
+        if(pct < 0) pct = 0; if(pct > 1) pct = 1;
+        const offset = circumference - (circumference * pct);
+        document.getElementById(id).style.strokeDashoffset = offset;
+    }
+
+    // --- AI ---
+    async function askAI() {
+        const name = document.getElementById('inName').value;
+        const key = settings.apiKey;
+        if(!name) { alert("Введи продукт!"); return; }
+        if(!key) { alert("Введи API Key в настройках!"); toggleSettings(); return; }
+
+        const btn = document.querySelector('.ai-btn');
+        const oldTxt = btn.innerText;
+        btn.innerText = "⏳";
+
+        try {
+            const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    model: "google/gemini-2.0-flash-exp:free",
+                    messages: [{ role: "user", content: `Дай JSON БЖУ для продукта: "${name}". Пример: {"k":100,"p":10,"f":5,"c":20}. ТОЛЬКО JSON.` }]
+                })
+            });
+            const data = await res.json();
+            const txt = data.choices[0].message.content;
+            const jsonStr = txt.match(/\{[\s\S]*?\}/)[0]; 
+            const json = JSON.parse(jsonStr);
+
+            // Заполняем поля (они доступны для редактирования!)
+            document.getElementById('inKcal').value = json.k;
+            document.getElementById('inProt').value = json.p;
+            document.getElementById('inFat').value = json.f;
+            document.getElementById('inCarb').value = json.c;
+        } catch(e) {
+            alert("Ошибка AI. Введи вручную.");
+        } finally {
+            btn.innerText = "✨";
+        }
+    }
+</script>
+
+</body>
+</html>
