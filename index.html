@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Calzen Flow Pro</title>
+    <title>Calzen Flow Calendar</title>
     <style>
         :root {
             --bg: #F2F2F7;
@@ -22,7 +22,7 @@
             background-color: var(--bg);
             color: var(--text);
             margin: 0;
-            padding: 20px 16px 140px 16px; /* Больше отступ снизу */
+            padding: 20px 16px 140px 16px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -32,10 +32,39 @@
 
         header { 
             display: flex; justify-content: space-between; align-items: center; 
-            margin-bottom: 15px; width: 100%;
+            margin-bottom: 10px; width: 100%;
         }
         h1 { font-size: 24px; font-weight: 800; margin: 0; }
         .icon-btn { background: none; border: none; font-size: 22px; cursor: pointer; padding: 5px; }
+
+        /* --- КАЛЕНДАРЬ --- */
+        .calendar-strip {
+            display: flex;
+            justify-content: space-between;
+            background: transparent;
+            margin-bottom: 20px;
+            padding: 5px 0;
+        }
+        .cal-day {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 55px;
+            cursor: pointer;
+            border-radius: 20px;
+            transition: 0.2s;
+        }
+        .cal-day span.day-name { font-size: 11px; color: var(--gray); margin-bottom: 4px; font-weight: 600; }
+        .cal-day span.day-num { font-size: 16px; font-weight: 600; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+        
+        /* Активный день (выбранный) - Черный */
+        .cal-day.active span.day-num { background: #000; color: #fff; }
+        .cal-day.active span.day-name { color: #000; }
+
+        /* Сегодняшний день (если не выбран) - Серый фон */
+        .cal-day.today:not(.active) span.day-num { background: #E5E5EA; color: #000; }
 
         /* --- НАСТРОЙКИ --- */
         #settingsPanel {
@@ -45,9 +74,8 @@
             padding: 20px;
             margin-bottom: 20px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-            animation: slideDown 0.3s ease;
+            border: 1px solid #E5E5EA;
         }
-        @keyframes slideDown { from {opacity: 0; transform: translateY(-10px);} to {opacity: 1; transform: translateY(0);} }
 
         .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
         label { font-size: 11px; color: var(--gray); font-weight: 600; display: block; margin-bottom: 4px; }
@@ -60,10 +88,17 @@
         .inp-st:focus { border-color: var(--blue); outline: none; background: #fff; }
 
         .btn-calc {
-            background: #000; color: white; border: none; width: 100%; padding: 14px;
+            background: #E5E5EA; color: #000; border: none; width: 100%; padding: 12px;
             border-radius: 14px; font-weight: 600; font-size: 14px; cursor: pointer;
-            margin-top: 10px;
+            margin-top: 5px;
         }
+
+        .btn-save-settings {
+            background: #000; color: #fff; border: none; width: 100%; padding: 16px;
+            border-radius: 16px; font-weight: 700; font-size: 16px; cursor: pointer;
+            margin-top: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .btn-save-settings:active { transform: scale(0.98); opacity: 0.9; }
 
         .divider { height: 1px; background: #E5E5EA; margin: 20px 0; }
 
@@ -91,7 +126,6 @@
         }
         .macro-label { font-size: 11px; color: var(--gray); margin-top: 4px; }
 
-        /* SVG */
         svg { width: 100%; height: 100%; overflow: visible; }
         path.bg { stroke: var(--track); stroke-width: 8; fill: none; stroke-linecap: round; }
         path.meter { stroke-width: 8; fill: none; stroke-linecap: round; transition: stroke-dashoffset 0.8s ease; }
@@ -109,16 +143,11 @@
             transition: background 0.2s;
         }
         .food-item.editing { border: 2px solid var(--blue); background: #F0F8FF; }
-
         .f-left h4 { margin: 0; font-size: 16px; font-weight: 500; }
         .f-left p { margin: 4px 0 0; font-size: 12px; color: var(--gray); }
-        
         .f-right { font-weight: 600; font-size: 14px; display: flex; align-items: center;}
-        
         .action-btn { background: none; border: none; font-size: 18px; padding: 5px 8px; cursor: pointer; color: #C7C7CC; }
-        .edit-btn:hover { color: var(--blue); }
-        .del-btn:hover { color: var(--red); }
-
+        
         /* --- НИЖНЯЯ ПАНЕЛЬ --- */
         .bottom-panel {
             position: fixed; bottom: 0; left: 0; right: 0;
@@ -139,29 +168,43 @@
             background: var(--blue); color: white; width: 50px; border-radius: 14px; 
             border: none; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;
         }
-        
-        /* Кнопка добавления/сохранения */
         .add-btn { 
             background: #000; color: white; font-weight: 700; border-radius: 14px; 
             border: none; padding: 14px; width: 100%; font-size: 16px; cursor: pointer;
             transition: 0.3s;
         }
         .add-btn.saving { background: var(--blue); }
+
+        /* --- TOAST --- */
+        #toast {
+            visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center;
+            border-radius: 50px; padding: 16px; position: fixed; z-index: 1000; left: 50%; top: 30px;
+            transform: translateX(-50%); font-size: 14px; font-weight: 600;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2); opacity: 0; transition: opacity 0.3s, top 0.3s;
+        }
+        #toast.show { visibility: visible; opacity: 1; top: 50px; }
+        #toast.success { background-color: #34C759; }
+        #toast.error { background-color: #FF3B30; }
+        
+        /* Сообщение если список пуст */
+        .empty-state { text-align: center; color: var(--gray); margin-top: 30px; font-size: 13px; }
     </style>
 </head>
 <body>
 
+<div id="toast">Уведомление</div>
+
 <div class="app-container">
     <header>
-        <h1>Сегодня</h1>
-        <div>
-            <button class="icon-btn" onclick="resetDay()" title="Очистить день">🗑️</button>
-            <button class="icon-btn" onclick="toggleSettings()" title="Настройки">⚙️</button>
-        </div>
+        <h1 id="headerTitle">Сегодня</h1>
+        <button class="icon-btn" onclick="toggleSettings()" title="Настройки">⚙️</button>
     </header>
 
+    <div class="calendar-strip" id="calendarStrip">
+        </div>
+
     <div id="settingsPanel">
-        <h3>👤 Параметры тела</h3>
+        <h3>👤 Мои данные</h3>
         <div class="settings-grid">
             <div><label>Текущий вес (кг)</label><input type="number" id="curWeight" class="inp-st" placeholder="80"></div>
             <div><label style="color:#007AFF">Желаемый вес</label><input type="number" id="targetWeight" class="inp-st" placeholder="70" style="border-color:#007AFF; background:#F0F8FF"></div>
@@ -170,10 +213,7 @@
         </div>
         
         <div class="settings-grid">
-            <div>
-                <label>Пол</label>
-                <select id="gender" class="inp-st"><option value="male">М</option><option value="female">Ж</option></select>
-            </div>
+            <div><label>Пол</label><select id="gender" class="inp-st"><option value="male">М</option><option value="female">Ж</option></select></div>
             <div>
                 <label>Активность</label>
                 <select id="activity" class="inp-st">
@@ -193,11 +233,11 @@
             <option value="2.2">🔥 Похудение (2.2 г/кг)</option>
         </select>
         
-        <button class="btn-calc" onclick="autoCalculate()">⚡ Рассчитать нормы</button>
+        <button class="btn-calc" onclick="autoCalculate()">⚡ Рассчитать БЖУ (Авто)</button>
 
         <div class="divider"></div>
 
-        <h3>🎯 Цели БЖУ</h3>
+        <h3>🎯 Цели БЖУ (Вручную)</h3>
         <div class="settings-grid">
             <div><label>Ккал</label><input type="number" id="goalKcal" class="inp-st"></div>
             <div><label>Белки</label><input type="number" id="goalProt" class="inp-st"></div>
@@ -205,8 +245,10 @@
             <div><label>Угли</label><input type="number" id="goalCarb" class="inp-st"></div>
         </div>
 
-        <label style="margin-top:10px">OpenRouter API Key (для AI)</label>
-        <input type="password" id="apiKey" class="inp-st" placeholder="sk-or-..." onchange="saveData()">
+        <label style="margin-top:10px">OpenRouter API Key</label>
+        <input type="password" id="apiKey" class="inp-st" placeholder="sk-or-...">
+        
+        <button class="btn-save-settings" onclick="saveSettingsManual()">💾 Сохранить настройки</button>
     </div>
 
     <div class="dashboard">
@@ -232,7 +274,6 @@
                 </div>
                 <div class="macro-label">Белки</div>
             </div>
-
             <div class="macro-item">
                 <div class="macro-gauge">
                     <svg viewBox="0 0 100 50">
@@ -243,7 +284,6 @@
                 </div>
                 <div class="macro-label">Жиры</div>
             </div>
-
             <div class="macro-item">
                 <div class="macro-gauge">
                     <svg viewBox="0 0 100 50">
@@ -258,6 +298,7 @@
     </div>
 
     <ul class="food-list" id="foodList"></ul>
+    <div id="emptyMsg" class="empty-state">Нет записей за этот день</div>
 
 </div>
 
@@ -280,7 +321,9 @@
 <script>
     // --- ДАННЫЕ ---
     let foodLog = [];
-    let editingId = null; // ID записи, которую сейчас редактируем
+    let editingId = null;
+    let selectedDateString = ""; // Текущая выбранная дата YYYY-MM-DD
+    let todayString = ""; // Сегодня YYYY-MM-DD
 
     let settings = {
         curWeight: 80, targetWeight: 70, height: 175, age: 25, 
@@ -291,24 +334,110 @@
 
     // --- ИНИЦИАЛИЗАЦИЯ ---
     window.onload = function() {
+        // Определяем "Сегодня"
+        const now = new Date();
+        todayString = getIsoDate(now);
+        selectedDateString = todayString;
+
         if(localStorage.getItem('myCalzenSettings')) {
             const loaded = JSON.parse(localStorage.getItem('myCalzenSettings'));
             settings = { ...settings, ...loaded };
         }
         if(localStorage.getItem('myCalzenLog')) {
             foodLog = JSON.parse(localStorage.getItem('myCalzenLog'));
+            // МИГРАЦИЯ: Если у старых записей нет даты, ставим им "сегодня"
+            foodLog.forEach(item => {
+                if(!item.dateString) item.dateString = todayString;
+            });
+            cleanupOldData(); // Удаляем старое
         }
+        
+        renderCalendar();
         renderSettings();
         updateUI();
     };
 
-    // --- ЛОГИКА ИНТЕРФЕЙСА ---
+    // Вспомогательная функция для получения YYYY-MM-DD (локальное время)
+    function getIsoDate(date) {
+        const offset = date.getTimezoneOffset() * 60000;
+        const localISOTime = (new Date(date - offset)).toISOString().slice(0, 10);
+        return localISOTime;
+    }
+
+    // --- ЧИСТКА ДАННЫХ (Удаляем старое > 7 дней) ---
+    function cleanupOldData() {
+        const limitDate = new Date();
+        limitDate.setDate(limitDate.getDate() - 7);
+        const limitStr = getIsoDate(limitDate);
+        
+        const initialCount = foodLog.length;
+        foodLog = foodLog.filter(item => item.dateString >= limitStr);
+        
+        if (foodLog.length < initialCount) {
+            localStorage.setItem('myCalzenLog', JSON.stringify(foodLog));
+            console.log("Старые записи удалены");
+        }
+    }
+
+    // --- КАЛЕНДАРЬ ---
+    function renderCalendar() {
+        const container = document.getElementById('calendarStrip');
+        container.innerHTML = "";
+        
+        // Находим Понедельник текущей недели
+        const curr = new Date();
+        const day = curr.getDay(); // 0-6 (0 это Вс)
+        // Если сегодня Вс (0), то отнимаем 6 дней, иначе отнимаем day-1
+        const diff = curr.getDate() - day + (day === 0 ? -6 : 1); 
+        
+        const monday = new Date(curr.setDate(diff));
+        const ruDays = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(monday);
+            d.setDate(monday.getDate() + i);
+            const dStr = getIsoDate(d);
+            
+            const isToday = (dStr === todayString);
+            const isSelected = (dStr === selectedDateString);
+
+            const el = document.createElement('div');
+            el.className = `cal-day ${isSelected ? 'active' : ''} ${isToday ? 'today' : ''}`;
+            el.onclick = () => selectDate(dStr);
+            
+            el.innerHTML = `
+                <span class="day-name">${ruDays[i]}</span>
+                <span class="day-num">${d.getDate()}</span>
+            `;
+            container.appendChild(el);
+        }
+
+        // Обновляем заголовок
+        const title = document.getElementById('headerTitle');
+        if (selectedDateString === todayString) title.innerText = "Сегодня";
+        else title.innerText = selectedDateString.split('-').reverse().join('.');
+    }
+
+    function selectDate(dateStr) {
+        selectedDateString = dateStr;
+        renderCalendar(); // Перерисовать (чтобы сдвинуть кружок)
+        updateUI(); // Показать данные за этот день
+    }
+
+    // --- УВЕДОМЛЕНИЯ ---
+    function showToast(msg, type = "success") {
+        const x = document.getElementById("toast");
+        x.innerText = msg;
+        x.className = "show " + type;
+        setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000);
+    }
+
     function toggleSettings() {
         const p = document.getElementById('settingsPanel');
         p.style.display = (p.style.display === 'block') ? 'none' : 'block';
     }
 
-    function saveData() {
+    function saveSettingsManual() {
         settings.curWeight = parseFloat(document.getElementById('curWeight').value) || 0;
         settings.targetWeight = parseFloat(document.getElementById('targetWeight').value) || 0;
         settings.height = parseFloat(document.getElementById('height').value) || 0;
@@ -325,6 +454,7 @@
 
         localStorage.setItem('myCalzenSettings', JSON.stringify(settings));
         updateUI();
+        showToast("✅ Настройки сохранены!");
     }
 
     function renderSettings() {
@@ -351,14 +481,14 @@
         const act = parseFloat(document.getElementById('activity').value);
         const protFactor = parseFloat(document.getElementById('proteinMode').value);
 
-        if(!curW || !h || !targetW) { alert("Заполни веса и рост!"); return; }
+        if(!curW || !h || !targetW) { showToast("⚠️ Заполни веса и рост!", "error"); return; }
 
         let bmr = (10 * targetW) + (6.25 * h) - (5 * age) + (g === 'male' ? 5 : -161);
         
         const newGoals = {};
         newGoals.kcal = Math.round(bmr * act);
-        newGoals.p = Math.round(curW * protFactor); // Белок от текущего
-        newGoals.f = Math.round(curW * 1.0);        // Жир от текущего
+        newGoals.p = Math.round(curW * protFactor); 
+        newGoals.f = Math.round(curW * 1.0);        
         newGoals.c = Math.round((newGoals.kcal - (newGoals.p * 4) - (newGoals.f * 9)) / 4);
         if(newGoals.c < 30) newGoals.c = 30;
 
@@ -367,11 +497,10 @@
         document.getElementById('goalFat').value = newGoals.f;
         document.getElementById('goalCarb').value = newGoals.c;
         
-        saveData(); 
-        alert(`Рассчитано!\nДефицит для: ${targetW}кг\nБелок для мышц: ${newGoals.p}г`);
+        showToast("✅ Рассчитано! Нажми 'Сохранить'");
     }
 
-    // --- РЕДАКТИРОВАНИЕ И ДОБАВЛЕНИЕ ---
+    // --- ДОБАВЛЕНИЕ (С учетом ДАТЫ) ---
     function processFood() {
         const name = document.getElementById('inName').value || "Продукт";
         const k = parseInt(document.getElementById('inKcal').value) || 0;
@@ -381,16 +510,17 @@
 
         if(k===0 && p===0 && f===0 && c===0) return;
 
+        // Если добавляем/редактируем, используем selectedDateString
         if (editingId) {
-            // Режим СОХРАНЕНИЯ (обновляем старое)
             const index = foodLog.findIndex(item => item.id === editingId);
             if (index !== -1) {
-                foodLog[index] = { id: editingId, name, k, p, f, c };
+                // При редактировании оставляем старую дату или меняем на текущую выбранную? 
+                // Обычно оставляют ту же дату, но здесь проще перезаписать на выбранную.
+                foodLog[index] = { id: editingId, name, k, p, f, c, dateString: selectedDateString };
             }
-            editingId = null; // Выходим из режима редактирования
+            editingId = null;
         } else {
-            // Режим ДОБАВЛЕНИЯ (создаем новое)
-            foodLog.push({ id: Date.now(), name, k, p, f, c });
+            foodLog.push({ id: Date.now(), name, k, p, f, c, dateString: selectedDateString });
         }
 
         saveAndRender();
@@ -401,37 +531,33 @@
     function startEdit(id) {
         const item = foodLog.find(x => x.id === id);
         if(!item) return;
-
-        // Заполняем поля данными из списка
         document.getElementById('inName').value = item.name;
         document.getElementById('inKcal').value = item.k;
         document.getElementById('inProt').value = item.p;
         document.getElementById('inFat').value = item.f;
         document.getElementById('inCarb').value = item.c;
-
-        editingId = id; // Включаем режим редактирования
-        updateUI(); // Перерисовываем (чтобы подсветить элемент)
-
-        // Меняем кнопку
+        editingId = id;
+        
+        // Кнопка
         const btn = document.getElementById('mainBtn');
-        btn.innerText = "Сохранить изменения";
+        btn.innerText = "Сохранить";
         btn.classList.add('saving');
+        
+        // Подсветка в списке (для этого перерисуем UI)
+        updateUI(); 
     }
 
     function deleteFood(id, event) {
-        event.stopPropagation(); // Чтобы клик не сработал как "Редактировать"
-        if(editingId === id) {
-            editingId = null;
-            clearInputs();
-            resetBtnState();
-        }
+        event.stopPropagation();
+        if(editingId === id) { editingId = null; clearInputs(); resetBtnState(); }
         foodLog = foodLog.filter(x => x.id !== id);
         saveAndRender();
     }
 
+    // Очистка ТОЛЬКО выбранного дня
     function resetDay() {
-        if(confirm("Начать новый день?")) {
-            foodLog = [];
+        if(confirm(`Очистить записи за ${selectedDateString}?`)) {
+            foodLog = foodLog.filter(item => item.dateString !== selectedDateString);
             editingId = null;
             clearInputs();
             resetBtnState();
@@ -439,7 +565,6 @@
         }
     }
 
-    // --- ВСПОМОГАТЕЛЬНЫЕ ---
     function saveAndRender() {
         localStorage.setItem('myCalzenLog', JSON.stringify(foodLog));
         updateUI();
@@ -459,45 +584,50 @@
         btn.classList.remove('saving');
     }
 
-    // --- ОТРИСОВКА ---
+    // --- ОТРИСОВКА СПИСКА (С ФИЛЬТРОМ ПО ДАТЕ) ---
     function updateUI() {
         let total = { k:0, p:0, f:0, c:0 };
         const list = document.getElementById('foodList');
+        const emptyMsg = document.getElementById('emptyMsg');
         list.innerHTML = "";
 
-        foodLog.slice().reverse().forEach(item => {
+        // Фильтруем записи только за выбранную дату
+        const dayLog = foodLog.filter(item => item.dateString === selectedDateString);
+
+        if (dayLog.length === 0) {
+            emptyMsg.style.display = 'block';
+        } else {
+            emptyMsg.style.display = 'none';
+        }
+
+        // Рендер
+        dayLog.slice().reverse().forEach(item => {
             total.k += item.k; total.p += item.p; total.f += item.f; total.c += item.c;
             
             const isEditing = (item.id === editingId);
             const li = document.createElement('li');
             li.className = `food-item ${isEditing ? 'editing' : ''}`;
-            
-            // Клик по элементу вызывает редактирование
             li.onclick = () => startEdit(item.id);
-
             li.innerHTML = `
                 <div class="f-left"><h4>${item.name}</h4><p>${item.k} ккал</p></div>
                 <div class="f-right">
                     <span style="color:var(--green)">Б:${item.p}</span>&nbsp;
                     <span style="color:var(--orange)">Ж:${item.f}</span>&nbsp;
                     <span style="color:var(--blue)">У:${item.c}</span>
-                    <button class="action-btn edit-btn">✏️</button>
                     <button class="action-btn del-btn" onclick="deleteFood(${item.id}, event)">×</button>
                 </div>
             `;
             list.appendChild(li);
         });
 
+        // Обновляем круги
         const left = settings.goals.kcal - total.k;
         document.getElementById('txtLeft').innerText = left;
         setArc('arcKcal', total.k, settings.goals.kcal, 251);
-
         document.getElementById('txtProt').innerText = `${total.p}/${settings.goals.p}`;
         setArc('arcProt', total.p, settings.goals.p, 125);
-
         document.getElementById('txtFat').innerText = `${total.f}/${settings.goals.f}`;
         setArc('arcFat', total.f, settings.goals.f, 125);
-
         document.getElementById('txtCarb').innerText = `${total.c}/${settings.goals.c}`;
         setArc('arcCarb', total.c, settings.goals.c, 125);
     }
@@ -513,34 +643,52 @@
     async function askAI() {
         const name = document.getElementById('inName').value;
         const key = settings.apiKey;
-        if(!name) { alert("Введи продукт!"); return; }
-        if(!key) { alert("Введи API Key в настройках!"); toggleSettings(); return; }
+        if(!name) { showToast("⚠️ Введи название продукта!", "error"); return; }
+        if(!key) { showToast("🔑 Введи и сохрани API ключ!", "error"); toggleSettings(); return; }
 
         const btn = document.querySelector('.ai-btn');
-        const oldTxt = btn.innerText;
         btn.innerText = "⏳";
 
         try {
             const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                 method: "POST",
-                headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+                headers: { 
+                    "Authorization": `Bearer ${key}`, 
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://calzen.app",
+                    "X-Title": "Calzen App"
+                },
                 body: JSON.stringify({
-                    model: "google/gemini-2.0-flash-exp:free",
-                    messages: [{ role: "user", content: `Дай JSON БЖУ для продукта: "${name}". Пример: {"k":100,"p":10,"f":5,"c":20}. ТОЛЬКО JSON.` }]
+                    model: "deepseek/deepseek-r1-0528:free", 
+                    messages: [{ 
+                        role: "user", 
+                        content: `Рассчитай КБЖУ для продукта: "${name}" (1 средняя порция). 
+                        ВЫВЕДИ ТОЛЬКО JSON В ФОРМАТЕ: {"k":ккал,"p":белки,"f":жиры,"c":угли}. 
+                        НЕ ПИШИ НИКАКОГО ТЕКСТА, НИКАКИХ ТЕГОВ, ТОЛЬКО JSON.` 
+                    }]
                 })
             });
+            
             const data = await res.json();
-            const txt = data.choices[0].message.content;
-            const jsonStr = txt.match(/\{[\s\S]*?\}/)[0]; 
-            const json = JSON.parse(jsonStr);
+            if (data.error) { showToast("❌ Ошибка API", "error"); return; }
 
-            // Заполняем поля (они доступны для редактирования!)
+            let txt = data.choices[0].message.content;
+            txt = txt.replace(/<think>[\s\S]*?<\/think>/g, ""); 
+            const jsonMatch = txt.match(/\{[\s\S]*?\}/);
+            
+            if (!jsonMatch) throw new Error("JSON не найден");
+            const json = JSON.parse(jsonMatch[0]);
+
             document.getElementById('inKcal').value = json.k;
             document.getElementById('inProt').value = json.p;
             document.getElementById('inFat').value = json.f;
             document.getElementById('inCarb').value = json.c;
+
+            showToast("✅ Готово! Данные заполнены.");
+
         } catch(e) {
-            alert("Ошибка AI. Введи вручную.");
+            console.error(e);
+            showToast("❌ Ошибка сети или модели", "error");
         } finally {
             btn.innerText = "✨";
         }
