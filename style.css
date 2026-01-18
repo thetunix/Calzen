@@ -71,7 +71,17 @@ label { font-size: 11px; color: var(--gray); font-weight: 600; display: block; m
 .gauge-val { position: absolute; bottom: 0; left: 0; right: 0; text-align: center; }
 .gauge-val h2 { font-size: 46px; font-weight: 800; margin: 0; line-height: 1; letter-spacing: -1px; }
 .gauge-val p { font-size: 13px; color: var(--gray); margin: 6px 0 0 0; font-weight: 500; }
-
+/* Добавь это в style.css */
+.date-nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.date-nav h1 {
+    font-size: 22px; /* Чуть меньше, чтобы влезало */
+    min-width: 120px;
+    text-align: center;
+}
 .macros-row { display: flex; justify-content: space-around; margin-top: 25px; }
 .macro-item { width: 80px; text-align: center; position: relative; }
 .macro-gauge { height: 40px; width: 80px; margin: 0 auto; position: relative; }
@@ -107,4 +117,5 @@ path.meter { stroke-width: 8; fill: none; stroke-linecap: round; transition: str
 .ai-btn { background: var(--blue); color: white; }
 .save-btn { background: var(--yellow); color: black; }
 .add-btn { background: #000; color: white; font-weight: 700; border-radius: 16px; border: none; padding: 16px; width: 100%; font-size: 16px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+
 .add-btn:active { transform: scale(0.98); }
