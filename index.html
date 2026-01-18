@@ -9,8 +9,13 @@
 <body>
 
 <div class="app-container">
-    <header>
-        <h1>Сегодня</h1>
+<header>
+        <div class="date-nav">
+            <button class="icon-btn" onclick="changeDate(-1)">◀</button>
+            <h1 id="dateDisplay">Сегодня</h1>
+            <button class="icon-btn" onclick="changeDate(1)">▶</button>
+        </div>
+        
         <div class="header-controls">
             <div class="streak-badge" title="Дней подряд">🔥 <span id="streakVal">0</span></div>
             <button class="icon-btn" onclick="toggleTrophies()" title="Достижения">🏆</button>
@@ -135,4 +140,5 @@
 
 <script src="script.js"></script>
 </body>
+
 </html>
