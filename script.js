@@ -1,26 +1,57 @@
-// --- ДАННЫЕ И НАСТРОЙКИ ---
-let foodLog = [];
+// --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
+let history = {}; // Хранилище: { "2023-10-27": { foods: [], water: 0 }, ... }
 let favorites = [];
+let dayOffset = 0; // 0 = сегодня, -1 = вчера и т.д.
+
+// Настройки по умолчанию
 let settings = {
     curWeight: 80, targetWeight: 75, height: 175, age: 25, 
     gender: 'male', activity: '1.375', proteinMode: '2.0',
     goals: { kcal: 2000, p: 160, f: 80, c: 200 },
     apiKey: '',
-    water: 0,
-    lastLogin: '', 
     streak: 0,
-    unlockedTrophies: [] // ID полученных ачивок
+    lastLogin: '',
+    unlockedTrophies: []
 };
 
-// Список всех доступных ачивок
 const allTrophies = [
     { id: 'first_step', icon: '🏁', name: 'Первый шаг', desc: 'Добавь первый продукт' },
-    { id: 'water_master', icon: '💧', name: 'Водолей', desc: 'Выпей 2.5л воды за день' },
+    { id: 'water_master', icon: '💧', name: 'Водолей', desc: 'Выпей 2.5л воды' },
     { id: 'protein_king', icon: '🥩', name: 'Белковый король', desc: 'Выполни норму белка' },
     { id: 'streak_3', icon: '🔥', name: 'В огне', desc: 'Серия 3 дня подряд' },
     { id: 'streak_7', icon: '🚀', name: 'Неделя', desc: 'Серия 7 дней подряд' },
     { id: 'perfect_day', icon: '💎', name: 'Идеал', desc: 'Попади в КБЖУ (±10%)' }
 ];
+
+// --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДАТЫ ---
+function getSelectedDateKey() {
+    const d = new Date();
+    d.setDate(d.getDate() + dayOffset);
+    return d.toISOString().split('T')[0];
+}
+
+function getDisplayDate() {
+    if (dayOffset === 0) return "Сегодня";
+    if (dayOffset === -1) return "Вчера";
+    if (dayOffset === 1) return "Завтра";
+    
+    const d = new Date();
+    d.setDate(d.getDate() + dayOffset);
+    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+}
+
+// Получить данные текущего дня (или создать пустые)
+function getCurrentDayData() {
+    const key = getSelectedDateKey();
+    if (!history[key]) {
+        history[key] = { foods: [], water: 0 };
+    }
+    // Обратная совместимость для старых записей, если они были массивом
+    if (Array.isArray(history[key])) {
+        history[key] = { foods: history[key], water: 0 };
+    }
+    return history[key];
+}
 
 // --- ЗАПУСК ---
 window.onload = function() {
@@ -34,48 +65,54 @@ window.onload = function() {
 
 function loadAll() {
     if(localStorage.getItem('cz_set')) settings = { ...settings, ...JSON.parse(localStorage.getItem('cz_set')) };
-    if(localStorage.getItem('cz_log')) foodLog = JSON.parse(localStorage.getItem('cz_log'));
+    
+    if(localStorage.getItem('cz_hist')) {
+        history = JSON.parse(localStorage.getItem('cz_hist'));
+    } else if (localStorage.getItem('cz_log')) {
+        // Миграция со старой версии
+        const todayKey = new Date().toISOString().split('T')[0];
+        history[todayKey] = { foods: JSON.parse(localStorage.getItem('cz_log')), water: settings.water || 0 };
+    }
+    
     if(localStorage.getItem('cz_fav')) favorites = JSON.parse(localStorage.getItem('cz_fav'));
 }
 
 function saveAll() {
     localStorage.setItem('cz_set', JSON.stringify(settings));
-    localStorage.setItem('cz_log', JSON.stringify(foodLog));
+    localStorage.setItem('cz_hist', JSON.stringify(history));
     localStorage.setItem('cz_fav', JSON.stringify(favorites));
 }
 
+// --- УПРАВЛЕНИЕ КАЛЕНДАРЕМ ---
+function changeDate(dir) {
+    dayOffset += dir;
+    updateUI();
+}
+
 // --- СИСТЕМА ДОСТИЖЕНИЙ ---
-function checkAchievements(totals) {
+function checkAchievements(totals, currentWater) {
+    if (dayOffset !== 0) return; // Ачивки только за сегодня
+
     let newUnlock = false;
+    const unlock = (id) => {
+        if (!settings.unlockedTrophies.includes(id)) {
+            settings.unlockedTrophies.push(id);
+            newUnlock = true;
+            const tr = allTrophies.find(t => t.id === id);
+            alert(`🏆 Достижение: ${tr.name}!\n${tr.desc}`);
+        }
+    };
 
-    // 1. Первый шаг
-    if (foodLog.length > 0) unlock('first_step');
-
-    // 2. Вода
-    if (settings.water >= 2.5) unlock('water_master');
-
-    // 3. Белок (если набрал >= 95% цели)
+    if (totals.k > 0) unlock('first_step');
+    if (currentWater >= 2.5) unlock('water_master');
     if (totals.p >= settings.goals.p * 0.95) unlock('protein_king');
-
-    // 4. Стрики
     if (settings.streak >= 3) unlock('streak_3');
     if (settings.streak >= 7) unlock('streak_7');
 
-    // 5. Идеальный день (все показатели в рамках 90-110%)
     if (totals.k >= settings.goals.kcal * 0.9 && totals.k <= settings.goals.kcal * 1.1 &&
         totals.p >= settings.goals.p * 0.9 &&
         totals.f >= settings.goals.f * 0.9) {
         unlock('perfect_day');
-    }
-
-    function unlock(id) {
-        if (!settings.unlockedTrophies.includes(id)) {
-            settings.unlockedTrophies.push(id);
-            newUnlock = true;
-            // Находим название ачивки для алерта
-            const tr = allTrophies.find(t => t.id === id);
-            alert(`🏆 Новое достижение: ${tr.name}!\n${tr.desc}`);
-        }
     }
 
     if (newUnlock) {
@@ -101,7 +138,7 @@ function renderTrophies() {
 function toggleTrophies() {
     const p = document.getElementById('trophyPanel');
     const s = document.getElementById('settingsPanel');
-    s.style.display = 'none'; // Скрываем настройки если открыты
+    s.style.display = 'none';
     p.style.display = (p.style.display === 'block') ? 'none' : 'block';
 }
 
@@ -115,12 +152,11 @@ function checkStreak() {
         if (settings.lastLogin === yesterday.toDateString()) {
             settings.streak++;
         } else if (settings.lastLogin && settings.lastLogin !== today) {
-            settings.streak = 1; // Сброс, если пропустил день
+            settings.streak = 1;
         } else if (!settings.lastLogin) {
             settings.streak = 1;
         }
         settings.lastLogin = today;
-        settings.water = 0; // Новый день - сброс воды
         saveAll();
     }
     document.getElementById('streakVal').innerText = settings.streak;
@@ -128,7 +164,8 @@ function checkStreak() {
 
 // --- ВОДА ---
 function addWater() {
-    settings.water = parseFloat((settings.water + 0.25).toFixed(2));
+    const dayData = getCurrentDayData();
+    dayData.water = parseFloat((dayData.water + 0.25).toFixed(2));
     saveAll();
     updateUI();
 }
@@ -165,7 +202,8 @@ function renderFavs() {
 }
 
 function quickAdd(name, k, p, f, c) {
-    foodLog.push({ id: Date.now(), name, k, p, f, c });
+    const dayData = getCurrentDayData();
+    dayData.foods.push({ id: Date.now(), name, k, p, f, c });
     saveAll();
     updateUI();
 }
@@ -188,7 +226,6 @@ function saveData() {
     settings.proteinMode = document.getElementById('proteinMode').value;
     settings.apiKey = document.getElementById('apiKey').value;
     
-    // Ручные цели
     settings.goals.kcal = parseInt(document.getElementById('goalKcal').value) || 0;
     settings.goals.p = parseInt(document.getElementById('goalProt').value) || 0;
     settings.goals.f = parseInt(document.getElementById('goalFat').value) || 0;
@@ -245,7 +282,9 @@ function addFood() {
     
     if(k===0 && p===0) return;
     
-    foodLog.push({ id: Date.now(), name, k, p, f, c });
+    const dayData = getCurrentDayData();
+    dayData.foods.push({ id: Date.now(), name, k, p, f, c });
+    
     document.getElementById('inName').value = "";
     document.getElementById('inKcal').value = "";
     document.getElementById('inProt').value = "";
@@ -257,26 +296,33 @@ function addFood() {
 }
 
 function del(id) {
-    foodLog = foodLog.filter(x => x.id !== id);
+    const dayData = getCurrentDayData();
+    dayData.foods = dayData.foods.filter(x => x.id !== id);
     saveAll();
     updateUI();
 }
 
 function resetDay() {
-    if(confirm("Сбросить день?")) {
-        foodLog = [];
-        settings.water = 0;
+    if(confirm("Очистить этот день?")) {
+        const key = getSelectedDateKey();
+        history[key] = { foods: [], water: 0 };
         saveAll();
         updateUI();
     }
 }
 
+// --- UI UPDATER ---
 function updateUI() {
+    document.getElementById('dateDisplay').innerText = getDisplayDate();
+
+    const dayData = getCurrentDayData();
+    const foods = dayData.foods;
+    
     let t = { k:0, p:0, f:0, c:0 };
     const list = document.getElementById('foodList');
     list.innerHTML = "";
     
-    foodLog.slice().reverse().forEach(x => {
+    foods.slice().reverse().forEach(x => {
         t.k += x.k; t.p += x.p; t.f += x.f; t.c += x.c;
         list.innerHTML += `
         <li class="food-item">
@@ -290,7 +336,8 @@ function updateUI() {
         </li>`;
     });
 
-    document.getElementById('waterCount').innerText = settings.water;
+    document.getElementById('waterCount').innerText = dayData.water;
+    
     document.getElementById('txtLeft').innerText = settings.goals.kcal - t.k;
     setArc('arcKcal', t.k, settings.goals.kcal, 251);
     
@@ -303,7 +350,7 @@ function updateUI() {
     document.getElementById('txtCarb').innerText = `${t.c}/${settings.goals.c}`;
     setArc('arcCarb', t.c, settings.goals.c, 125);
 
-    checkAchievements(t); // Проверяем ачивки после каждого обновления
+    checkAchievements(t, dayData.water);
 }
 
 function setArc(id, val, max, len) {
@@ -311,7 +358,7 @@ function setArc(id, val, max, len) {
     document.getElementById(id).style.strokeDashoffset = len - (len * pct);
 }
 
-// --- AI ИСПРАВЛЕННЫЙ ---
+// --- AI INTELLIGENCE (DEEPSEEK R1) ---
 async function askAI() {
     const key = settings.apiKey;
     if(!key) { alert("Введи OpenRouter API Key в настройках!"); toggleSettings(); return; }
@@ -328,19 +375,34 @@ async function askAI() {
             headers: { 
                 "Authorization": `Bearer ${key}`, 
                 "Content-Type": "application/json"
-                // УБРАЛИ HTTP-Referer, так как он вызывает ошибку в браузере
             },
             body: JSON.stringify({
-                model: "deepseek/deepseek-r1-0528:free",
-                messages: [{ role: "user", content: `JSON БЖУ 100г продукта: "${name}". Пример: {"k":100,"p":10,"f":5,"c":20}. ТОЛЬКО JSON.` }]
+                model: "deepseek/deepseek-r1-0528:free", 
+                messages: [
+                    { 
+                        role: "system", 
+                        content: "Ты диетолог. Отвечай ТОЛЬКО JSON объектом. Никаких рассуждений, никакого текста. Формат: {\"k\":ккал,\"p\":белки,\"f\":жиры,\"c\":углеводы} для 100г продукта." 
+                    },
+                    { 
+                        role: "user", 
+                        content: `Продукт: "${name}". Дай БЖУ в JSON.` 
+                    }
+                ]
             })
         });
 
         if (!res.ok) throw new Error(`Ошибка API: ${res.status}`);
 
         const data = await res.json();
-        const jsonStr = data.choices[0].message.content;
-        const json = JSON.parse(jsonStr.match(/\{[\s\S]*?\}/)[0]);
+        const content = data.choices[0].message.content;
+        
+        // DeepSeek R1 часто пишет <think>...</think>. Удаляем это с помощью RegEx
+        // И ищем первый попавшийся JSON объект {...}
+        const jsonMatch = content.match(/\{[\s\S]*?\}/);
+        
+        if (!jsonMatch) throw new Error("AI не вернул JSON");
+        
+        const json = JSON.parse(jsonMatch[0]);
 
         document.getElementById('inKcal').value = json.k;
         document.getElementById('inProt').value = json.p;
@@ -348,7 +410,8 @@ async function askAI() {
         document.getElementById('inCarb').value = json.c;
 
     } catch(e) {
-        alert("Ошибка: " + e.message + "\nПроверь ключ или интернет.");
+        console.error(e);
+        alert("Ошибка AI: " + e.message + "\nПопробуй еще раз.");
     } finally {
         btn.innerText = "✨";
     }
@@ -358,9 +421,9 @@ async function askAdvice() {
     const key = settings.apiKey;
     if(!key) { alert("Введи API Key в настройках!"); toggleSettings(); return; }
 
-    // Считаем остатки
+    const dayData = getCurrentDayData();
     let t = { k:0, p:0, f:0, c:0 };
-    foodLog.forEach(x => { t.k += x.k; t.p += x.p; t.f += x.f; t.c += x.c; });
+    dayData.foods.forEach(x => { t.k += x.k; t.p += x.p; t.f += x.f; t.c += x.c; });
     
     const leftK = settings.goals.kcal - t.k;
     const btn = document.querySelector('.ai-advisor-btn');
@@ -374,20 +437,24 @@ async function askAdvice() {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                model: "deepseek/deepseek-r1-0528:free",
-                messages: [{ role: "user", content: `Я на диете. Осталось: ${leftK} ккал. Белки цель: ${settings.goals.p}г (съел ${t.p}г). Посоветуй ОДНО блюдо/продукт, чтобы добрать норму. Кратко. и более доступное блюдо например курицы и тд` }]
+                model: "deepseek/deepseek-r1-0528:free", 
+                messages: [{ role: "user", content: `Я на диете. Осталось: ${leftK} ккал. Белки цель: ${settings.goals.p}г (съел ${t.p}г). Посоветуй ОДНО доступное блюдо/продукт (например курица, творог и тд), чтобы добрать норму. Ответь очень кратко, без тегов размышления.` }]
             })
         });
 
         if (!res.ok) throw new Error(`Ошибка API: ${res.status}`);
         
         const data = await res.json();
-        alert(data.choices[0].message.content);
+        let answer = data.choices[0].message.content;
+
+        // Удаляем теги <think> если они есть, чтобы показать только совет
+        answer = answer.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+
+        alert(answer);
         
     } catch(e) {
-        alert("Ошибка соединения: " + e.message);
+        alert("Ошибка: " + e.message);
     } finally {
         btn.innerText = "💡 Совет AI";
     }
-
 }
