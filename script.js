@@ -331,7 +331,7 @@ async function askAI() {
                 // УБРАЛИ HTTP-Referer, так как он вызывает ошибку в браузере
             },
             body: JSON.stringify({
-                model: "xiaomi/mimo-v2-flash:free",
+                model: "deepseek/deepseek-r1-0528:free",
                 messages: [{ role: "user", content: `JSON БЖУ 100г продукта: "${name}". Пример: {"k":100,"p":10,"f":5,"c":20}. ТОЛЬКО JSON.` }]
             })
         });
@@ -389,4 +389,5 @@ async function askAdvice() {
     } finally {
         btn.innerText = "💡 Совет AI";
     }
+
 }
